@@ -1,0 +1,100 @@
+# Контрольная работа 2
+# Кривогина Анна Михайловна УИБО-04-24
+## Задание 1
+Для выполнения работы использовалось веб-приложение [OWASP Juice Shop](https://juice-shop.herokuapp.com/#/search)
+### 1. Использованные данные для входа:
+В поле Email введена строка: ' OR 1=1--
+В поле Password введено любое значение (в моем примере, 123)
+[(Скриншоты)](https://github.com/KrivoginaAnna/-1/blob/main/Скриншот%201.png)
+### 2. Под каким пользователем удалось войти
+Удалось войти под пользователем с ID = 1, что соответствует Администратору (согласно структуре Juice Shop)
+[(Скриншоты)](https://github.com/KrivoginaAnna/-1/blob/main/Скриншот%202.png)
+### 3. Почему удалось войти именно под этим пользователем
+Запрос аутентификации, скорее всего, выглядит так:
+```sql
+SELECT * FROM Users WHERE email = '[введённый email]' AND password = '[введённый пароль]'
+```
+После подстановки инъекции:
+```sql
+SELECT * FROM Users WHERE email = '' OR 1=1--' AND password = '123'
+```
+Пояснение к работе:
+Комментарий -- обнуляет остальную часть SQL-запроса. Условие OR 1=1 всегда истинно, поэтому СУБД возвращает первую запись из таблицы — обычно это администратор (ID = 1).
+### 4. Хранение аутентификационной информации
+* Где хранится: В localStorage и в Cookie.
+* Что представляет собой: JWT-токен, закодированный в Base64.
+* Как передаётся: В заголовке Authorization: Bearer <token> каждого последующего запроса.
+### Ответы на вопросы
+- Что такое SQL инъекция?
+SQL-инъекция — это уязвимость, возникающая при некорректной обработке пользовательского ввода в SQL-запросах, позволяющая атакующему внедрить вредоносный SQL-код и манипулировать базой данных.
+- Почему ввод строки ' or 1=1;-- позволил войти в аккаунт администратора?
+Потому что она обходит проверку пароля, заставляя запрос вернуть первую запись (администратора), т.к. условие 1=1 всегда истинно, а остаток запроса закомментирован.
+- Как защитить web-ресурс от подобного рода атак?
+* Использовать параметризованные запросы (Prepared Statements).
+* Применять валидацию и фильтрацию входных данных.
+* Ограничить права доступа СУБД.
+* Не выводить ошибки СУБД пользователю.
+## Задание 2. Узнайте пароль администратора
+### 1. Логин администратора
+admin@juice-sh.op
+### 2. Получение токена
+После входа через SQLi, в DevTools → Network → запрос /rest/user/whoami → вкладка Cookies → значение token.
+Пример токена:
+```
+eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJzdGF0dXMiOiJzdWNjZXNzIiwiZGF0YSI6eyJpZCI6MSwidXNlcm5hbWUiOiJuYWJlciBrYW5rYSIsImVtYWlsIjoiYWRtaW5AanVpY2Utc2gub3AiLCJwYXNzd29yZCI6IjAxOTIwMjNhN2JiZDczMjUwNTE2ZjA2OWRmMThiNTAwIiwicm9sZSI6ImFkbWluIiwiZGVsdXhlVG9rZW4iOiIiLCJsYXN0TG9naW5JcCI6IiIsInByb2ZpbGVJbWFnZSI6ImFzc2V0cy9wdWJsaWMvaW1hZ2VzL3VwbG9hZHMvZGVmYXVsdEFkbWluLnBuZyIsInRvdHBTZWNyZXQiOiIiLCJpc0FjdGl2ZSI6dHJ1ZSwiY3JlYXRlZEF0IjoiMjAyNS0xMS0zMCAxNDozODowNS45NjAgKzAwOjAwIiwidXBkYXRlZEF0IjoiMjAyNS0xMS0zMCAxNDo1NTo0Mi45MDYgKzAwOjAwIiwiZGVsZXRlZEF0IjpudWxsfSwiaWF0IjoxNzY0NTE2NjI5fQ.pKLmeLvtzBcFyVv29LbFP8jaMWp9rjbfLTYXJ4rN4A1kTrB8ywiS8wk8cq_IIP2BLAJ4Tkbl4UkKLf7I8AqTTukFKugvFCovHt7PPANppcJrFT_EL8VUttgOi0sSajT1PHzRnb8S-rhCmrFAbxl6cLXJFfi89rPYfPN-Kh7eY3w	
+```
+[(Скриншоты)]()
+### 3. Декодирование JWT
+JWT состоит из трёх частей. Декодируем вторую часть (payload) из Base64:
+```json
+{
+  "id": 1,
+  "email": "admin@juice-sh.op",
+  "password": "0192023a7bbd73250516f069df18b500"
+}
+```
+Хэш пароля: 0192023a7bbd73250516f069df18b500 — это MD5 от слова admin.
+[(Скриншоты)](https://github.com/KrivoginaAnna/-1/blob/main/Скриншот%203.png)
+**Проверка через [Base64 Decode](https://www.base64decode.org/):**
+Хэш → admin
+[(Скриншоты)](https://github.com/KrivoginaAnna/-1/blob/main/Скриншот%204.png)
+### 4. Ответы на вопросы
+- Какой логин у администратора?
+admin@juice-sh.op
+- Какой хэш пароля?
+0192023a7bbd73250516f069df18b500 (MD5)
+- Какой пароль?
+admin
+- Что такое cookie?
+Cookie — небольшие фрагменты данных, отправляемые сервером и хранящиеся в браузере пользователя для отслеживания сессии, предпочтений и т.д.
+- Как устранить уязвимость?
+* Не хранить пароли (даже в хэшированном виде) в JWT.
+* Использовать httpOnly, Secure, SameSite флаги для cookie.
+* Хранить только ID сессии на сервере, без чувствительных данных.
+## Задание 3. «Чужая корзина» (IDOR)
+### 1. Параметр, отвечающий за корзину
+После добавления товара и открытия корзины (/basket/1), в URL виден ID корзины.
+Также в localStorage есть поле bid — basket ID.
+[(Скриншоты)](https://github.com/KrivoginaAnna/-1/blob/main/Скриншот%205.png)
+Изменение значения bid в localStorage (например, на 2) и обновление страницы → открывает корзину другого пользователя.
+[(Скриншоты)](https://github.com/KrivoginaAnna/-1/blob/main/Скриншот%206.png)
+### 2. Рекомендации по исправлению
+* Проверять принадлежность корзины текущему пользователю на сервере.
+* Не использовать предсказуемые ID без авторизационной проверки.
+* Внедрить авторизационные политики (RBAC) для всех операций с объектами.
+## Задание 4. XSS-инъекция
+Выполнение
+В поле поиска (в шапке сайта) введена строка:
+```html
+<img src="x" onerror="alert('XSS')">
+```
+После нажатия Enter — появляется всплывающее окно с надписью "XSS".
+Примечание: Просто <script>alert('XSS')</script> не сработает - Juice Shop фильтрует <script> теги.
+[(Скриншоты)](https://github.com/KrivoginaAnna/-1/blob/main/Скриншот%207.png)
+
+
+
+
+
+
+
